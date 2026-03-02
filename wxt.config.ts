@@ -7,4 +7,13 @@ export default defineConfig({
   webExt: {
     disabled: true
   },
+  manifest: {
+    permissions: ['storage'],
+    web_accessible_resources: [
+      {
+        matches: ['*://*.google.com/*'],
+        resources: ['icon/*.svg'],
+      },
+    ]
+  },
 });
