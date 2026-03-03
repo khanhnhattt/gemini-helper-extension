@@ -102,22 +102,13 @@ export const renderArchivedChatSection = async (): Promise<void> => {
         return;
     }
 
-    // Fake archived data: mark every second conversation as archived
     const conversationLinks = Array.from(
         conversationsList.querySelectorAll<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR),
     );
 
     if (conversationLinks.length === 0) return;
 
-    const fakeArchivedIds = new Set<string>();
-    conversationLinks.forEach((link, index) => {
-        const id = getConversationIdFromLink(link);
-        if (!id) return;
-
-        if (index % 2 === 0) {
-            fakeArchivedIds.add(id);
-        }
-    });
+    const archivedIds = getArchivedIds();
 
     // Render "Archived Chat" section
     const archivedSection = conversationsList.cloneNode(true) as HTMLElement;
@@ -161,7 +152,7 @@ export const renderArchivedChatSection = async (): Promise<void> => {
             if (!id) return;
 
             const item = link.closest<HTMLElement>('[data-test-id="conversation"]') ?? link;
-            const isArchived = fakeArchivedIds.has(id);
+            const isArchived = archivedIds.has(id);
 
             if ((keepArchived && !isArchived) || (!keepArchived && isArchived)) {
                 item.style.display = 'none';
@@ -181,7 +172,7 @@ export const renderArchivedChatSection = async (): Promise<void> => {
     hideNonArchivedInSection(archivedBlock, true);
 
     if (header) {
-        header.textContent = `Archived Chats (${fakeArchivedIds.size})`;
+        header.textContent = `Archived Chats (${archivedIds.size})`;
         header.style.userSelect = 'none';
         header.style.cursor = 'pointer';
         header.addEventListener('click', () => {

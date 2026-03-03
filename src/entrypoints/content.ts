@@ -1,7 +1,5 @@
 import { MENU_CONTENT_SELECTOR } from '@/constants/constants';
-import { injectArchiveOption, renderArchivedChatSection } from '@/utils/sidebarUtils';
 import { getAccountKey } from '~/utils/accountUtils';
-import { getChatIds } from '~/utils/chatUtils';
 
 export default defineContentScript({
   matches: ['*://*.google.com/*'],
@@ -14,7 +12,6 @@ export default defineContentScript({
       return new Promise((resolve) => {
         const observer = new MutationObserver(() => {
           const el = document.querySelector<HTMLElement>('.chat-history');
-          console.log('el', el)
           if (el) {
             observer.disconnect();
             resolve(el);
@@ -27,11 +24,16 @@ export default defineContentScript({
     const chatHistory = await waitForchatHistory();
 
     // 0. Initialize data
-    console.log('Accounst:', getAccountKey());
+    const accountKey = getAccountKey();
+    if (!accountKey) {
+      return;
+    }
+    await initArchivedStore(accountKey);
+
     console.log('Chat Ids:', await getChatIds(chatHistory));
 
     // 2. Inject "Archived Chats" section
-    renderArchivedChatSection();
+    await renderArchivedChatSection();
 
     // Add MutationObserver on changes
     observeMenus();
