@@ -20,6 +20,13 @@ export const getChatIds = async (chatHistory: HTMLElement): Promise<string[] | n
 export const handleArchiveForCurrentChat = async (chatId: string): Promise<void> => {
     try {
         await toggleArchivedChat(chatId);
+
+        // Update UI
+        const conversationList = document.querySelector<HTMLElement>(ALL_CONVERSATIONS_SELECTOR);
+        if (!conversationList) {
+            return;
+        }
+        updateChatSection(conversationList, true);
     } catch (error) {
         console.error('Error archiving chat:', chatId, error);
     }

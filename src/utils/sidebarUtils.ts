@@ -9,7 +9,7 @@ const ARCHIVE_ICON_MARGIN_TOP = '1px';
 const ARCHIVE_ICON_MARGIN_BOTTOM = '1px';
 const ARCHIVE_ICON_MARGIN_RIGHT = '11px';
 
-const ALL_CONVERSATIONS_SELECTOR = '[data-test-id="all-conversations"]';
+export const ALL_CONVERSATIONS_SELECTOR = '[data-test-id="all-conversations"]';
 const CONVERSATION_LINK_SELECTOR = 'a[href*="/app/"][data-test-id="conversation"]';
 const ARCHIVED_SECTION_DATA_ATTR = 'data-gh-archived-section';
 
@@ -144,32 +144,10 @@ export const renderArchivedChatSection = async (): Promise<void> => {
         conversationsList.append(child as Node)
     });
 
-    const hideNonArchivedInSection = (root: HTMLElement, keepArchived: boolean): void => {
-        const links = Array.from(root.children) as HTMLAnchorElement[];
-
-        links.forEach((link) => {
-            const id = getConversationIdFromLink(link.querySelector<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR) as HTMLAnchorElement);
-            if (!id) return;
-
-            const item = link.closest<HTMLElement>('[data-test-id="conversation"]') ?? link;
-            const isArchived = archivedIds.has(id);
-
-            if ((keepArchived && !isArchived) || (!keepArchived && isArchived)) {
-                item.style.display = 'none';
-            }
-        });
-
-        // Default display none for archived section
-        if (keepArchived) {
-            updateVisibility(root, isCollapsed);
-        }
-    };
+    // Show non-archived in the original list, archived in the cloned section
+    updateChatSection(conversationsList, isCollapsed);
 
     const archivedBlock = conversationsList.querySelector('div.conversations-container[' + ARCHIVED_SECTION_DATA_ATTR + '="true"]') as HTMLElement;
-
-    // Show non-archived in the original list, archived in the cloned section
-    hideNonArchivedInSection(conversationsList.querySelector('div.conversations-container') as HTMLElement, false);
-    hideNonArchivedInSection(archivedBlock, true);
 
     if (header) {
         header.textContent = `Archived Chats (${archivedIds.size})`;
@@ -180,6 +158,39 @@ export const renderArchivedChatSection = async (): Promise<void> => {
             archivedSection.setAttribute('data-gh-archived-collapsed', String(isCollapsed));
             updateVisibility(archivedBlock, isCollapsed);
         });
+    }
+};
+
+// TODO: currently working on updating UI after Archiving. 
+// Current Issue: chat disappeard from "Chats" but not updated in "Archived Chats"
+// Possible Solution: 
+// - Look at initial render "Archived Chats"
+// - Do not use display: none but maintain a set of chats and move between 2 sections
+export const updateChatSection = (conversationsList: HTMLElement, isCollapsed: boolean) => {
+    const archivedBlock = conversationsList.querySelector('div.conversations-container[' + ARCHIVED_SECTION_DATA_ATTR + '="true"]') as HTMLElement;
+    
+    hideNonArchivedInSection(conversationsList.querySelector('div.conversations-container') as HTMLElement, false, isCollapsed);
+    hideNonArchivedInSection(archivedBlock, true, isCollapsed);
+}
+
+export const hideNonArchivedInSection = (root: HTMLElement, keepArchived: boolean, isCollapsed: boolean): void => {
+    const links = Array.from(root.children) as HTMLAnchorElement[];
+
+    links.forEach((link) => {
+        const id = getConversationIdFromLink(link.querySelector<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR) as HTMLAnchorElement);
+        if (!id) return;
+
+        const item = link.closest<HTMLElement>('[data-test-id="conversation"]') ?? link;
+        const isArchived = getArchivedIds().has(id);
+
+        if ((keepArchived && !isArchived) || (!keepArchived && isArchived)) {
+            item.style.display = 'none';
+        }
+    });
+
+    // Default display none for archived section
+    if (keepArchived) {
+        root.style.display = isCollapsed ? 'none' : 'block';
     }
 };
 
