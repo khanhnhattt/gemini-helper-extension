@@ -17,10 +17,14 @@ const getConversationIdFromLink = (link: HTMLAnchorElement): string | null => {
     const href = link.getAttribute('href');
     if (!href) return null;
 
+    // Get the last segment (may include params)
     const segments = href.split('/').filter(Boolean);
-    const lastSegment = segments[segments.length - 1];
+    let lastSegment = segments[segments.length - 1];
+    if (!lastSegment) return null;
 
-    return lastSegment || null;
+    // Remove query string if present
+    const [conversationId] = lastSegment.split('?');
+    return conversationId || null;
 };
 
 const createArchiveIcon = (): HTMLImageElement => {
@@ -116,25 +120,44 @@ export const renderArchivedChatSection = async (): Promise<void> => {
     });
 
     // Render "Archived Chat" section
-    const clonedSection = conversationsList.cloneNode(true) as HTMLElement;
-    clonedSection.setAttribute(ARCHIVED_SECTION_DATA_ATTR, 'true');
+    const archivedSection = conversationsList.cloneNode(true) as HTMLElement;
+    archivedSection.setAttribute(ARCHIVED_SECTION_DATA_ATTR, 'true');
 
-    const header = clonedSection.querySelector<HTMLElement>('h1') ??
-        clonedSection.querySelector<HTMLElement>('[role="heading"]');
+    const header = archivedSection.querySelector<HTMLElement>('h1') ??
+        archivedSection.querySelector<HTMLElement>('[role="heading"]');
 
-    if (header) {
-        header.textContent = `Archived Chats (${fakeArchivedIds.size})`;
+    // Default hide
+    let isCollapsed = true;
+
+    const updateVisibility = (root: HTMLElement, isCollapsed: boolean): void => {
+        root.style.display = isCollapsed ? 'none' : 'block';
     }
 
-    Array.from(clonedSection.children).forEach(child => {
+    Array.from(archivedSection.children).forEach(child => {
+        if (child.id.match('conversations-list*')) {
+            // Set click handler to the child
+            Array.from(child.children).forEach(child => {
+                child.addEventListener('click', (event: Event) => {
+                    const mouseEvent = event as MouseEvent
+                    // Manually invoke Gemini chat open logic without following native <a> link
+                    const link = child.querySelector<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR) as HTMLAnchorElement | null;
+                    const conversationId = link ? getConversationIdFromLink(link) : null;
+                    if (conversationId) {
+                        handleChatClick(mouseEvent, conversationId);
+                    }
+                });
+            });
+        }
+
+        child.setAttribute(ARCHIVED_SECTION_DATA_ATTR, 'true');
         conversationsList.append(child as Node)
     });
 
     const hideNonArchivedInSection = (root: HTMLElement, keepArchived: boolean): void => {
-        const links = Array.from(root.querySelectorAll<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR));
+        const links = Array.from(root.children) as HTMLAnchorElement[];
 
         links.forEach((link) => {
-            const id = getConversationIdFromLink(link);
+            const id = getConversationIdFromLink(link.querySelector<HTMLAnchorElement>(CONVERSATION_LINK_SELECTOR) as HTMLAnchorElement);
             if (!id) return;
 
             const item = link.closest<HTMLElement>('[data-test-id="conversation"]') ?? link;
@@ -144,9 +167,50 @@ export const renderArchivedChatSection = async (): Promise<void> => {
                 item.style.display = 'none';
             }
         });
+
+        // Default display none for archived section
+        if (keepArchived) {
+            updateVisibility(root, isCollapsed);
+        }
     };
 
+    const archivedBlock = conversationsList.querySelector('div.conversations-container[' + ARCHIVED_SECTION_DATA_ATTR + '="true"]') as HTMLElement;
+
     // Show non-archived in the original list, archived in the cloned section
-    hideNonArchivedInSection(conversationsList, false);
-    hideNonArchivedInSection(clonedSection, true);
+    hideNonArchivedInSection(conversationsList.querySelector('div.conversations-container') as HTMLElement, false);
+    hideNonArchivedInSection(archivedBlock, true);
+
+    if (header) {
+        header.textContent = `Archived Chats (${fakeArchivedIds.size})`;
+        header.style.userSelect = 'none';
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            archivedSection.setAttribute('data-gh-archived-collapsed', String(isCollapsed));
+            updateVisibility(archivedBlock, isCollapsed);
+        });
+    }
+};
+
+// Inside your Vue component or injection logic
+const handleChatClick = (e: MouseEvent, chatId: string) => {
+    e.preventDefault(); // Stop the page from reloading
+
+    const newUrl = `/app/${chatId}`;
+
+    // 1. Update the URL in the address bar without reloading
+    window.history.pushState({}, '', newUrl);
+
+    // 2. Trigger Gemini's internal navigation
+    // Gemini (like most modern Google apps) listens for 'popstate' 
+    // or navigation events to update its UI.
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    // Optional: If Gemini doesn't react to popstate, you can 
+    // find and click the invisible real link in the sidebar 
+    // that matches this ID to force its internal router to fire.
+    const realLink = document.querySelector<HTMLElement>(`a[href*="${chatId}"]`);
+    if (realLink) {
+        realLink.click();
+    }
 };
