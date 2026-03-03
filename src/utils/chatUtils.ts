@@ -1,10 +1,10 @@
-export const getChatIds = async (): Promise<string[] | null> => {
+export const getChatIds = async (chatHistory: HTMLElement): Promise<string[] | null> => {
     try {
         // Wait for the chat links to be loaded
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Get the chat links
-        const chatLinks = document.querySelectorAll('a[href*="/app/"][data-test-id="conversation"]');
+        const chatLinks = chatHistory.querySelectorAll('a[href*="/app/"][data-test-id="conversation"]');
         
         // Return chat ids
         return Array.from(chatLinks)
